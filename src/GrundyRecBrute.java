@@ -1,4 +1,3 @@
-package grundy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -8,7 +7,7 @@ import java.util.Collections;
  * Ce programme ne contient que les méthodes permettant de tester jouerGagnant()
  * Cette version est brute sans aucune amélioration
  *
- * @author J-F. Kamp et C. Tibermacine
+ * @author Léa Vimart, Thomas Brami Coatual
  */
 
 class GrundyRecBrute {

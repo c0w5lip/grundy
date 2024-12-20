@@ -1,0 +1,1 @@
+javac -d ../class ../src/GrundyRecBrute.java
