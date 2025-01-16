@@ -12,18 +12,79 @@ import java.util.Collections;
 
 class GrundyRecBruteEff {
 
+    /**Variable globale */
+    long cpt = 0;
+
+
     /**
      * Méthode principal du programme
      */
     void principal() {
-        testJouerGagnant();
-		testPremier();
-		testSuivant();
+        //testJouerGagnant();
+		//testPremier();
+		//testSuivant();
 
-        //leJeu();
+        leJeu(); //BOUCLE DE JEU joueur contre machine qui appelle jouerGangnant()
         //testEstGagnanteEfficacite();
     }
 	
+
+    void leJeu() {
+        System.out.println("Bienvenue dans le jeu de Grundy !");
+
+        // Initialisation du jeu avec un seul tas
+        ArrayList<Integer> jeu = new ArrayList<>();
+        int tas_initial = SimpleInput.getInt("Entrez le nombre initial d'allumettes dans le tas : ");
+        jeu.add(tas_initial);
+
+        boolean joueurHumain = true;
+        boolean finPartie = false;
+
+        while (!finPartie) {
+            System.out.println("\nPlateau actuel : " + jeu);
+
+            if (joueurHumain) {
+                System.out.println("C'est votre tour !");
+                int ligne = SimpleInput.getInt("Choisissez le numéro du tas à diviser (0 à " + (jeu.size() - 1) + "): ");
+                int nb = SimpleInput.getInt("Combien d'allumettes voulez-vous retirer du tas " + ligne + " ? ");
+
+                if (ligne < 0 || ligne >= jeu.size() || nb <= 0 || nb >= jeu.get(ligne) || 2 * nb == jeu.get(ligne)) {
+                    System.out.println("Coup invalide. Réessayez.");
+                } else {
+                    enlever(jeu, ligne, nb);
+                    joueurHumain = false;
+                }
+            } else {
+                System.out.println("C'est au tour de la machine.");
+                if (jouerGagnant(jeu)) {
+                    System.out.println("La machine a joué un coup gagnant.");
+                } else {
+                    System.out.println("La machine n'a pas trouvé de coup gagnant.");
+                    ArrayList<Integer> essai = new ArrayList<>();
+                    premier(jeu, essai);
+                    jeu.clear();
+                    jeu.addAll(essai);
+                }
+                joueurHumain = true;
+            }
+
+            // Vérification de fin de partie
+            if (!estPossible(jeu)) {
+                finPartie = true;
+                System.out.println("\nPlateau final : " + jeu);
+                if (joueurHumain) {
+                    System.out.println("La machine gagne !");
+                } else {
+                    System.out.println("Félicitations, vous avez gagné !");
+                }
+            }
+        }
+    }
+
+
+
+
+
     /**
      * Joue le coup gagnant s'il existe
      * 
@@ -223,7 +284,7 @@ class GrundyRecBruteEff {
     /**
      * Teste s'il est possible de séparer un des tas
      * 
-     * @param jeu      plateau de jeu
+     * @param jeu plateau de jeu
      * @return vrai s'il existe au moins un tas de 3 allumettes ou plus, faux sinon
      */
     boolean estPossible(ArrayList<Integer> jeu) {
