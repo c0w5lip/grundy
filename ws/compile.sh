@@ -1,1 +1,1 @@
-javac -d ../class ../src/GrundyRecBrute.java
+javac -d ../class ../src/GrundyRecBruteEff.java

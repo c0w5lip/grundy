@@ -17,7 +17,7 @@ class GrundyRecBruteEff {
 
 
     /**
-     * Méthode principal du programme
+     * Entrée du programme
      */
     void principal() {
         //testJouerGagnant();
@@ -29,21 +29,44 @@ class GrundyRecBruteEff {
     }
 	
 
+
+    /**
+     * Méthode principale qui gère le jeu
+     */
     void leJeu() {
         System.out.println("Bienvenue dans le jeu de Grundy !");
+        //écrire règles du jeu
 
-        // Initialisation du jeu avec un seul tas
+        // Initialisation du jeu
         ArrayList<Integer> jeu = new ArrayList<>();
         int tas_initial = SimpleInput.getInt("Entrez le nombre initial d'allumettes dans le tas : ");
         jeu.add(tas_initial);
 
-        boolean joueurHumain = true;
+        // Noms des joueurs
+        String joueur1 = "Vous";
+        String joueur2 = "La machine";
+        String joueurQuiJoue = "";
+        int choix;
+
+        // Choix du joueur qui commence
+        do {
+            choix = SimpleInput.getInt("Qui commence ? Tapez 1 pour " + joueur1 + " ou 2 pour " + joueur2 + " : ");
+            if (choix == 1) {
+                joueurQuiJoue = joueur1;
+            } else if (choix == 2) {
+                joueurQuiJoue = joueur2;
+            } else {
+                System.out.println("Erreur, choix invalide. Veuillez entrer 1 ou 2.");
+            }
+        } while (choix != 1 && choix != 2);
+
+
         boolean finPartie = false;
 
         while (!finPartie) {
             System.out.println("\nPlateau actuel : " + jeu);
 
-            if (joueurHumain) {
+            if (joueurQuiJoue.equals(joueur1)) {
                 System.out.println("C'est votre tour !");
                 int ligne = SimpleInput.getInt("Choisissez le numéro du tas à diviser (0 à " + (jeu.size() - 1) + "): ");
                 int nb = SimpleInput.getInt("Combien d'allumettes voulez-vous retirer du tas " + ligne + " ? ");
@@ -52,7 +75,7 @@ class GrundyRecBruteEff {
                     System.out.println("Coup invalide. Réessayez.");
                 } else {
                     enlever(jeu, ligne, nb);
-                    joueurHumain = false;
+                    joueurQuiJoue = joueur2; 
                 }
             } else {
                 System.out.println("C'est au tour de la machine.");
@@ -65,23 +88,22 @@ class GrundyRecBruteEff {
                     jeu.clear();
                     jeu.addAll(essai);
                 }
-                joueurHumain = true;
+                joueurQuiJoue = joueur1; 
             }
 
             // Vérification de fin de partie
             if (!estPossible(jeu)) {
                 finPartie = true;
                 System.out.println("\nPlateau final : " + jeu);
-                if (joueurHumain) {
-                    System.out.println("La machine gagne !");
+                if (joueurQuiJoue.equals(joueur1)) {
+                    System.out.println("La machine a gagné !");
                 } else {
                     System.out.println("Félicitations, vous avez gagné !");
                 }
             }
         }
+
     }
-
-
 
 
 
@@ -539,6 +561,33 @@ class GrundyRecBruteEff {
         } else {
             System.err.println("ERREUR\n");
         }
+    }
+
+
+    /**
+     * Méthode d'efficacité de la méthode estGagnante()
+     * Cette méthode mesure le nombre d'opérations élémentaires (cpt) et le temps d'exécution. 
+     */
+    void testEstGagnanteEfficacite() {
+        ArrayList<Integer> jeu = new ArrayList<>();
+        
+
+
+        // Mesure du temps de recherche
+        long tps_debut = System.nanoTime();
+
+        // Appel de la méthode estGagnante()
+        estGagnante(leTab, nbElem);
+
+        long tps_fin = System.nanoTime();
+        
+        // Calcul du temps d'exécution
+        long tps = tps_fin - tps_debut;
+        
+        // Affichage des résultats
+        System.out.println("*******Calcul de l'éfficacité de la méthode estGagnante()*******");
+        System.out.println("Nombre d'opérations (cpt) = " + cpt);
+        System.out.println("Temps d'exécution (en nanosecondes) : " + tps);
     }
 
 }
