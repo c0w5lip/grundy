@@ -1,21 +1,25 @@
 import java.util.ArrayList;
+import java.util.Collections; // I could also use TriSimples but we can't import it
 
 /**
  * Grundy game with AI for the machine.
- * Version 0
- * @version 0.0
+ * It implements implements optimizations by:
+ * - Storing losing and winning positions.
+ * - Using Theorem 3.4 to remove losing heaps from a situation.
+ * Version 3
+ * @version 3.0
  * @since 2025/16/01
  * @author ... and ...
  */
-class GrundyRecBruteEff {
+class GrundyRecPerdantNeutre {
 
-	/** The reset color for the console. */
+    /** The reset color for the console. */
     public static final String RESET = "\u001B[0m";
 
-	/** The green color for the console. */
+    /** The green color for the console. */
     public static final String GREEN = "\u001B[32m";
 
-	/** The red color for the console. */
+    /** The red color for the console. */
     public static final String RED = "\u001B[31m";
 
     /** The blue color for the console. */
@@ -23,7 +27,19 @@ class GrundyRecBruteEff {
 
     /** Operation counter. */
     long cpt = 0;
-    
+
+    /**
+     * ArrayList to store losing positions.
+     * Each element is an ArrayList representing a losing configuration.
+     */
+    ArrayList<ArrayList<Integer>> posPerdantes = new ArrayList<ArrayList<Integer>>();
+
+    /**
+     * ArrayList to store winning positions.
+     * Each element is an ArrayList representing a winning configuration.
+     */
+    ArrayList<ArrayList<Integer>> posGagnantes = new ArrayList<ArrayList<Integer>>();
+
     /**
      * Main method, entry point of the program.
      */
@@ -38,13 +54,15 @@ class GrundyRecBruteEff {
      * Launches the tests.
      */
     void launchTests() {
-        //testEstGagnanteEfficacite();
-        //testListerCoupsPossibles();
-        //testPremier();
-        //testSuivant();
-        leJeu();
+        testEstGagnanteEfficacite();
+        testListerCoupsPossibles();
+        testPremier();
+        testSuivant();
+        testEstConnuePerdante();
+        testEstConnueGagnante();
+        testSimplifier();
     }
-    
+
     /**
      * Main game loop allowing human vs AI play.
      */
@@ -55,17 +73,17 @@ class GrundyRecBruteEff {
         String nomMachine = "IA";
         String[] nomsJoueurs = {nomJoueur, nomMachine};
         int indexJoueur = 0; // Player starts
-        
+
         // Game loop
         boolean finPartie = false;
         while (!finPartie) {
             System.out.println("\nEtat du jeu : ");
             afficherJeu(jeu); // Improved display of the game
-            
+
             if (indexJoueur == 0) { // Human player's turn
                 
                 System.out.println("Tour de " + nomsJoueurs[indexJoueur]);
-                
+
                 // Show available moves
                 ArrayList<int[]> coupsPossibles = listerCoupsPossibles(jeu);
 
@@ -73,36 +91,36 @@ class GrundyRecBruteEff {
 
                 System.out.println("Coups possibles :");
                 for (int i = 0; i < coupsPossibles.size(); i++) {
-                    System.out.println((i+1) + ": Tas " + coupsPossibles.get(i)[0] + " -> " + coupsPossibles.get(i)[1] + " et " + (jeu.get(coupsPossibles.get(i)[0]) - coupsPossibles.get(i)[1]));
+                    System.out.println((i + 1) + ": Tas " + coupsPossibles.get(i)[0] + " -> " + coupsPossibles.get(i)[1] + " et " + (jeu.get(coupsPossibles.get(i)[0]) - coupsPossibles.get(i)[1]));
                 }
-                
+
                 // Get valid move from player
                 do {
                     System.out.print("Choisir un coup (1-" + coupsPossibles.size() + ") : ");
                     choix = SimpleInput.getInt("") - 1;
                 } while (choix < 0 || choix >= coupsPossibles.size());
-            
+
                 int tasADiviser = coupsPossibles.get(choix)[0];
                 int nbAllumettes = coupsPossibles.get(choix)[1];
-                
+
                 
                 enlever(jeu, tasADiviser, nbAllumettes);
-                
+
             } else { 
                 System.out.println("Tour de " + nomsJoueurs[indexJoueur]);
                 if (!jouerGagnant(jeu)) {
                     // If no winning move, play random valid move
                     ArrayList<int[]> coupsPossibles = listerCoupsPossibles(jeu);
-                    int choix = (int)(Math.random() * coupsPossibles.size());
+                    int choix = (int) (Math.random() * coupsPossibles.size());
 
                     int tasADiviser = coupsPossibles.get(choix)[0];
                     int nbAllumettes = coupsPossibles.get(choix)[1];
-                    
+
                     System.out.println("IA choisit : Tas " + tasADiviser + " -> " + nbAllumettes + " et " + (jeu.get(tasADiviser) - nbAllumettes));
                     enlever(jeu, tasADiviser, nbAllumettes);
                 }
             }
-            
+
             // Check if game is over
             if (!estPossible(jeu)) {
                 finPartie = true;
@@ -110,7 +128,7 @@ class GrundyRecBruteEff {
                 afficherJeu(jeu);
                 System.out.println(nomsJoueurs[indexJoueur] + " a gagnee !");
             }
-            
+
             // Switch player
             indexJoueur = (indexJoueur + 1) % 2;
         }
@@ -118,7 +136,7 @@ class GrundyRecBruteEff {
 
     /**
      * Lists all possible moves for a given game state, avoiding duplicates.
-     * 
+     *
      * @param jeu The current game state.
      * @return An ArrayList of int[], where each int[] represents a move: {heap index, number of matches to remove}.
      */
@@ -128,7 +146,7 @@ class GrundyRecBruteEff {
             if (jeu.get(i) > 2) {
                 for (int j = 1; j < jeu.get(i) / 2 + 1; j++) { // Iterate only up to half to avoid duplicates
                     if (2 * j != jeu.get(i)) {
-                        coups.add(new int[]{i, j});
+                        coups.add(new int[] { i, j });
                     }
                 }
             }
@@ -140,22 +158,25 @@ class GrundyRecBruteEff {
      * Test the efficiency of estGagnante method.
      */
     void testEstGagnanteEfficacite() {
-        System.out.println(GREEN + "\n*** Test d'efficacite de estGagnante ***" + RESET);
+        System.out.println(GREEN + "\n*** Test d'efficacite de estGagnante (Version 3) ***" + RESET);
         System.out.println("n\tNombre d'operations\tTemps (ms)");
-        
-        for (int n = 3; n <= 25; n++) {
+
+        for (int n = 3; n <= 50; n++) {
             ArrayList<Integer> jeu = new ArrayList<Integer>();
             jeu.add(n);
-            
+
+            posPerdantes.clear(); // Reset losing and winning positions for each test
+            posGagnantes.clear();
+
             long startTime = System.currentTimeMillis();
             cpt = 0;
-            
+
             // Appel de estGagnante et comptage des operations
             estGagnante(jeu);
-            
+
             long endTime = System.currentTimeMillis();
             long duration = endTime - startTime;
-            
+
             System.out.println(n + "\t" + cpt + "\t\t" + duration);
         }
     }
@@ -180,122 +201,121 @@ class GrundyRecBruteEff {
      */
     void lancerTests() {
         testJouerGagnant();
-		testPremier();
-		testSuivant();
+        testPremier();
+        testSuivant();
+        testEstConnuePerdante();
+        testEstConnueGagnante();
+        testSimplifier();
     }
-	
-	/**
-	* Asks the player for the starting number of matches as long as the number of matches entered is incorrect.
-	* @return an array of integers with index 0 initialized.
-	*/
-	ArrayList<Integer> demandeNombreAllumettes() {
-		int initialisation = SimpleInput.getInt("Nombre d'allumettes (>= 3) : "); 
 
-		while (initialisation <= 2) {
-			initialisation = SimpleInput.getInt("<!> Nombre d'allumettes (>= 3): "); 
-		}
-		ArrayList<Integer> ret = new ArrayList<Integer>();
-		ret.add(0, initialisation);
-		return ret;
-	}
+    /**
+     * Asks the player for the starting number of matches as long as the number of matches entered is incorrect.
+     *
+     * @return an array of integers with index 0 initialized.
+     */
+    ArrayList<Integer> demandeNombreAllumettes() {
+        int initialisation = SimpleInput.getInt("Nombre d'allumettes (>= 3) : ");
+
+        while (initialisation <= 2) {
+            initialisation = SimpleInput.getInt("<!> Nombre d'allumettes (>= 3): ");
+        }
+        ArrayList<Integer> ret = new ArrayList<Integer>();
+        ret.add(0, initialisation);
+        return ret;
+    }
 
     /**
      * Play the winning move if it exists.
-     * 
+     *
      * @param jeu game board.
      * @return true if there is a winning move, false otherwise.
      */
     boolean jouerGagnant(ArrayList<Integer> jeu) {
-	
         boolean gagnant = false;
-		
+        boolean erreur = false;
+
         if (jeu == null) {
             System.err.println("jouerGagnant(): le parametre jeu est null");
+            erreur = true;
         } else {
             ArrayList<Integer> essai = new ArrayList<Integer>();
-			
-			// Une toute premiere decomposition est effectuee a partir de jeu.
-			// Cette premiere decomposition du jeu est enregistree dans essai.
-			// ligne est le numero de la case du tableau ArrayList (qui commence a zero) qui
-			// memorise le tas (nbre d'allumettes) qui a ete decompose.
             int ligne = premier(jeu, essai);
-			
-			// mise en oeuvre de la regle numero2.
-			// Une situation (ou position) est dite gagnante pour la machine, s’il existe AU MOINS UNE decomposition
-			// (c-a-d UNE action qui consiste a decomposer un tas en 2 tas inegaux) perdante pour l’adversaire. C'est
-			// evidemment cette decomposition perdante qui sera choisie par la machine.
+
             while (ligne != -1 && !gagnant) {
-				// estPerdante est recursif.
                 if (estPerdante(essai)) {
-					// estPerdante (pour l'adversaire) a true ===> Bingo essai est la decomposition choisie par la machine qui est alors
-					// certaine de gagner !!
                     jeu.clear();
                     gagnant = true;
-					// essai est recopie dans jeu car essai est la nouvelle situation de jeu apres que la machine ait joue (gagnant).
                     for (int i = 0; i < essai.size(); i++) {
                         jeu.add(essai.get(i));
                     }
                 } else {
-					// estPerdante a false ===> la machine essaye une autre decomposition en faisant appel a "suivant".
-					// Si, apres execution de suivant, ligne est a (-1) alors il n'y a plus de decomposition possible a partir de jeu (et on sort du while).
-					// En d'autres mots : la machine n'a PAS trouve a partir de jeu UNE decomposition gagnante.
                     ligne = suivant(jeu, essai, ligne);
                 }
             }
         }
-		
-        return gagnant;
+
+        return gagnant && !erreur;
     }
-	
-	/**
+
+    /**
      * RECURSIVE method which indicates whether the configuration (of the current game or trial game) is losing.
-	 * This method is used by the machine to know if the opponent can lose (at 100%).
-     * 
+     * This method is used by the machine to know if the opponent can lose (at 100%).
+     *
      * @param jeu current game board (the state of the game at a certain point in the game).
      * @return true if (game) configuration is losing, false otherwise.
      */
     boolean estPerdante(ArrayList<Integer> jeu) {
-	
-        boolean ret = true; // par defaut la configuration est perdante
-		
+        boolean ret = true;
+        boolean erreur = false;
+        ArrayList<Integer> jeuSimplifie = null;
+
         if (jeu == null) {
             System.err.println("estPerdante(): le parametre jeu est null");
-        }
-		
-		else {
-			// si il n'y a plus que des tas de 1 ou 2 allumettes dans le plateau de jeu
-			// alors la situation est forcement perdante (ret=true) = FIN de la recursivite.
-            if ( !estPossible(jeu) ) {
+            erreur = true;
+        } else {
+            jeuSimplifie = simplifier(jeu);
+            // Check if the current game state is a known losing or winning position
+            if (estConnuePerdante(jeuSimplifie)) {
                 ret = true;
-            }
-			
-			else {
-				// creation d'un jeu d'essais qui va examiner toutes les decompositions
-				// possibles a partir de jeu.
-                ArrayList<Integer> essai = new ArrayList<Integer>(); // size = 0 !
-				
-				// toute premiere decomposition : enlever 1 allumette au premier tas qui possede
-				// au moins 3 allumettes, ligne = -1 signifie qu'il n'y a plus de tas d'au moins 3 allumettes.
-                int ligne = premier(jeu, essai);
-				
+            } else if (estConnueGagnante(jeuSimplifie)) {
+                ret = false;
+            } else if (!estPossible(jeuSimplifie)) {
+                ret = true;
+            } else {
+                ArrayList<Integer> essai = new ArrayList<Integer>();
+                int ligne = premier(jeuSimplifie, essai);
+
                 while ((ligne != -1) && ret) {
-                    cpt++; // Incrementer le compteur
+                    cpt++;
                     if (estPerdante(essai)) {
                         ret = false;
                     } else {
-                        ligne = suivant(jeu, essai, ligne);
+                        ligne = suivant(jeuSimplifie, essai, ligne);
+                    }
+                }
+
+                // If the position is losing, add it to the list of known losing positions
+                // Otherwise, add it to the list of known winning positions
+                ArrayList<Integer> jeuNormalise = normaliser(jeuSimplifie);
+                if (ret) {
+                    if (!estConnuePerdante(jeuNormalise)) {
+                        posPerdantes.add(jeuNormalise);
+                    }
+                } else {
+                    if (!estConnueGagnante(jeuNormalise)) {
+                        posGagnantes.add(jeuNormalise);
                     }
                 }
             }
         }
-		
-        return ret;
+
+        return ret && !erreur;
     }
-	
-	/**
+
+    /**
      * Indicates whether the configuration is a winner.
-	 * Methode that simply calls 'isLosing'.
-     * 
+     * Methode that simply calls 'isLosing'.
+     *
      * @param jeu game board.
      * @return true if the configuration is a winner, false otherwise.
      */
@@ -307,6 +327,105 @@ class GrundyRecBruteEff {
             ret = !estPerdante(jeu);
         }
         return ret;
+    }
+
+    /**
+     * Normalizes a game state by removing heaps of size 1 and 2 and sorting the remaining heaps.
+     *
+     * @param jeu The game state to normalize.
+     * @return The normalized game state.
+     */
+    ArrayList<Integer> normaliser(ArrayList<Integer> jeu) {
+        ArrayList<Integer> jeuNormalise = new ArrayList<Integer>();
+        for (int tas : jeu) {
+            if (tas > 2) {
+                jeuNormalise.add(tas);
+            }
+        }
+        Collections.sort(jeuNormalise);
+        return jeuNormalise;
+    }
+
+    /**
+     * Checks if a game state is a known losing position.
+     *
+     * @param jeu The game state to check.
+     * @return true if the game state is a known losing position, false otherwise.
+     */
+    boolean estConnuePerdante(ArrayList<Integer> jeu) {
+        boolean ret = false;
+        boolean erreur = false;
+
+        if (jeu == null) {
+            System.err.println("estConnuePerdante(): le parametre jeu est null");
+            erreur = true;
+        } else {
+            ArrayList<Integer> jeuNormalise = normaliser(jeu);
+            int i = 0;
+            while (i < posPerdantes.size() && !ret) {
+                if (posPerdantes.get(i).equals(jeuNormalise)) {
+                    ret = true;
+                }
+                i++;
+            }
+        }
+
+        return ret && !erreur;
+    }
+
+    /**
+     * Checks if a game state is a known winning position.
+     *
+     * @param jeu The game state to check.
+     * @return true if the game state is a known winning position, false otherwise.
+     */
+    boolean estConnueGagnante(ArrayList<Integer> jeu) {
+        boolean ret = false;
+        boolean erreur = false;
+
+        if (jeu == null) {
+            System.err.println("estConnueGagnante(): le parametre jeu est null");
+            erreur = true;
+        } else {
+            ArrayList<Integer> jeuNormalise = normaliser(jeu);
+            int i = 0;
+            while (i < posGagnantes.size() && !ret) {
+                if (posGagnantes.get(i).equals(jeuNormalise)) {
+                    ret = true;
+                }
+                i++;
+            }
+        }
+
+        return ret && !erreur;
+    }
+
+    /**
+     * Simplifies a game state by removing losing heaps according to Theorem 3.4.
+     *
+     * @param jeu The game state to simplify.
+     * @return The simplified game state.
+     */
+    ArrayList<Integer> simplifier(ArrayList<Integer> jeu) {
+        ArrayList<Integer> jeuSimplifie = new ArrayList<>(jeu);
+        boolean simplificationEffectuee;
+    
+        do {
+            simplificationEffectuee = false;
+            int i = 0;
+            while (i < jeuSimplifie.size() && !simplificationEffectuee) {
+                ArrayList<Integer> tasSeul = new ArrayList<>();
+                tasSeul.add(jeuSimplifie.get(i));
+                if (estConnuePerdante(tasSeul)) {
+                    jeuSimplifie.remove(i);
+                    simplificationEffectuee = true;
+                } else {
+                    i++;
+                }
+            }
+        } while (simplificationEffectuee);
+    
+        return jeuSimplifie;
     }
 
     /**
@@ -322,17 +441,17 @@ class GrundyRecBruteEff {
         ArrayList<Integer> resJeu1 = new ArrayList<Integer>();
         resJeu1.add(4);
         resJeu1.add(2);
-		
+
         testCasJouerGagnant(jeu1, resJeu1, true);
-        
+
     }
 
     /**
      * Test a case of the playWinner() method.
-	 *
-	 * @param jeu the game board.
-	 * @param resJeu the game board after playWinner.
-	 * @param res the result expected by playWinner.
+     *
+     * @param jeu   the game board.
+     * @param resJeu the game board after playWinner.
+     * @param res    the result expected by playWinner.
      */
     void testCasJouerGagnant(ArrayList<Integer> jeu, ArrayList<Integer> resJeu, boolean res) {
         // Arrange
@@ -343,25 +462,25 @@ class GrundyRecBruteEff {
 
         
         System.out.print(jeu.toString() + " " + resExec + " : ");
-		boolean egaliteJeux = jeu.equals(resJeu);
-        if (  egaliteJeux && (res == resExec) ) {
+        boolean egaliteJeux = jeu.equals(resJeu);
+        if (egaliteJeux && (res == resExec)) {
             System.out.println(GREEN + "OK" + RESET);
         } else {
             System.err.println(RED + "ERREUR" + RESET);
         }
-    }	
+    }
 
     /**
      * Divide the matches in a line into two piles (1 line = 1 pile).
-	 * The new heap is necessarily placed at the end of the board.
-	 * The heap that is divided decreases by the number of matches removed.
-     * 
-     * @param jeu array of matches per line.
+     * The new heap is necessarily placed at the end of the board.
+     * The heap that is divided decreases by the number of matches removed.
+     *
+     * @param jeu   array of matches per line.
      * @param ligne heap for which matches must be separated.
-     * @param nb number of matches REMOVED from the heap (ligne) during separation.
+     * @param nb    number of matches REMOVED from the heap (ligne) during separation.
      */
-    void enlever ( ArrayList<Integer> jeu, int ligne, int nb ) {
-		// traitement des erreurs
+    void enlever(ArrayList<Integer> jeu, int ligne, int nb) {
+        // traitement des erreurs
         if (jeu == null) {
             System.err.println("enlever() : le parametre jeu est null");
         } else if (ligne >= jeu.size()) {
@@ -373,17 +492,17 @@ class GrundyRecBruteEff {
         } else if (2 * nb == jeu.get(ligne)) {
             System.err.println("enlever() : le nb d'allumettes a retirer est la moitie");
         } else {
-			// nouveau tas ajoute au jeu (necessairement en fin de tableau)
-			// ce nouveau tas contient le nbre d'allumettes retirees (nb) du tas a separer			
+            // nouveau tas ajoute au jeu (necessairement en fin de tableau)
+            // ce nouveau tas contient le nbre d'allumettes retirees (nb) du tas a separer
             jeu.add(nb);
-			// le tas restant possede "nb" allumettes en moins
-            jeu.set ( ligne, (jeu.get(ligne) - nb) );
+            // le tas restant possede "nb" allumettes en moins
+            jeu.set(ligne, (jeu.get(ligne) - nb));
         }
     }
 
     /**
      * Tests whether it is possible to separate one of the heaps.
-     * 
+     *
      * @param jeu game board.
      * @return true if there is at least one heap of 3 or more matches, false otherwise.
      */
@@ -405,56 +524,46 @@ class GrundyRecBruteEff {
 
     /**
      * Create a very first test configuration from the game.
-     * 
-     * @param jeu game board.
+     *
+     * @param jeu      game board.
      * @param jeuEssai new game configuration.
      * @return the number of the heap divided in two or (-1) if there is no heap of at least 3 matches.
      */
     int premier(ArrayList<Integer> jeu, ArrayList<Integer> jeuEssai) {
-	
-        int numTas = -1; // pas de tas a separer par defaut
-		int i;
-		
+        int numTas = -1;
+        boolean erreur = false;
+
         if (jeu == null) {
             System.err.println("premier(): le parametre jeu est null");
-        } else if (!estPossible((jeu)) ){
+            erreur = true;
+        } else if (!estPossible((jeu))) {
             System.err.println("premier(): aucun tas n'est divisible");
+            erreur = true;
         } else if (jeuEssai == null) {
             System.err.println("premier(): le parametre jeuEssai est null");
+            erreur = true;
         } else {
-            // avant la copie du jeu dans jeuEssai il y a un reset de jeuEssai 
-            jeuEssai.clear(); // size = 0
-            i = 0;
-			
-			// recopie case par case de jeu dans jeuEssai
-			// jeuEssai est le même que le jeu avant la premiere configuration d'essai
-            while (i < jeu.size()) {
-                jeuEssai.add(jeu.get(i));
-                i = i + 1;
+            jeuEssai.clear();
+            for (int val : jeu) {
+                jeuEssai.add(val);
             }
-			
-            i = 0;
-			// rechercher un tas d'allumettes d'au moins 3 allumettes dans le jeu
-			// sinon numTas = -1
-			boolean trouve = false;
-            while ( (i < jeu.size()) && !trouve) {
-				
-				// si on trouve un tas d'au moins 3 allumettes
-				if ( jeuEssai.get(i) >= 3 ) {
-					trouve = true;
-					numTas = i;
-				}
-				
-				i = i + 1;
+
+            boolean trouve = false;
+            int i = 0;
+            while (i < jeu.size() && !trouve) {
+                if (jeuEssai.get(i) >= 3) {
+                    trouve = true;
+                    numTas = i;
+                }
+                i++;
             }
-			
-			// separe le tas (case numTas) en un nouveau tas d'UNE SEULE allumette qui vient se placer en fin du tableau 
-			// le tas en case numTas a diminue d'une allumette (retrait d'une allumette)
-			// jeuEssai est le plateau de jeu qui fait apparaître cette separation
-            if ( numTas != -1 ) enlever ( jeuEssai, numTas, 1 );
+
+            if (numTas != -1) {
+                enlever(jeuEssai, numTas, 1);
+            }
         }
-		
-        return numTas;
+
+        return erreur ? -1 : numTas;
     }
 
     /**
@@ -477,9 +586,10 @@ class GrundyRecBruteEff {
 
     /**
      * Test a case of the testPremier method.
-	 * @param jeu the game board.
-	 * @param ligne the number of the heap separated first.
-	 * @param res the game board after a first separation.
+     *
+     * @param jeu    the game board.
+     * @param ligne  the number of the heap separated first.
+     * @param res    the game board after a first separation.
      */
     void testCasPremier(ArrayList<Integer> jeu, int ligne, ArrayList<Integer> res) {
         // Arrange
@@ -489,81 +599,64 @@ class GrundyRecBruteEff {
         int noLigne = premier(jeu, jeuEssai);
         
         System.out.println("\nnoLigne = " + noLigne + " jeuEssai = " + jeuEssai.toString());
-		boolean egaliteJeux = jeuEssai.equals(res);
-        if ( egaliteJeux && noLigne == ligne ) {
+        boolean egaliteJeux = jeuEssai.equals(res);
+        if (egaliteJeux && noLigne == ligne) {
             System.out.println(GREEN + "OK\n" + RESET);
         } else {
             System.err.println(GREEN + "ERREUR\n" + RESET);
         }
     }
 
-	/**
-	 * Generates the following test setup (i.e. ONE possible decomposition).
-	 * @param jeu game board.
-	 * @param jeuEssai play test configuration after separation.
-	 * @param ligne the number of the heap which is the last to have been separated.
-	 * @return the number of the heap divided in two for the new configuration, -1 if no more decomposition is possible.
-	 */
+    /**
+     * Generates the following test setup (i.e. ONE possible decomposition).
+     *
+     * @param jeu      game board.
+     * @param jeuEssai play test configuration after separation.
+     * @param ligne    the number of the heap which is the last to have been separated.
+     * @return the number of the heap divided in two for the new configuration, -1 if no more decomposition is possible.
+     */
     int suivant(ArrayList<Integer> jeu, ArrayList<Integer> jeuEssai, int ligne) {
-	
-        // System.out.println("suivant(" + jeu.toString() + ", " +jeuEssai.toString() +
-        // ", " + ligne + ") = ");
-		
-		int numTas = -1; // par defaut il n'y a plus de decomposition possible
-		
-        int i = 0;
-		// traitement des erreurs
+        int numTas = -1;
+        boolean erreur = false;
+
         if (jeu == null) {
             System.err.println("suivant(): le parametre jeu est null");
+            erreur = true;
         } else if (jeuEssai == null) {
             System.err.println("suivant() : le parametre jeuEssai est null");
+            erreur = true;
         } else if (ligne >= jeu.size()) {
             System.err.println("suivant(): le parametre ligne est trop grand");
-        }
-		
-		else {
-		
-			int nbAllumEnLigne = jeuEssai.get(ligne);
-			int nbAllDernCase = jeuEssai.get(jeuEssai.size() - 1);
-			
-			// si sur la même ligne (passee en parametre) on peut encore retirer des allumettes,
-			// c-a-d si l'ecart entre le nombre d'allumettes sur cette ligne et
-			// le nombre d'allumettes en fin de tableau est > 2, alors on retire encore
-			// 1 allumette sur cette ligne et on ajoute 1 allumette en derniere case		
-            if ( (nbAllumEnLigne - nbAllDernCase) > 2 ) {
-                jeuEssai.set ( ligne, (nbAllumEnLigne - 1) );
-                jeuEssai.set ( jeuEssai.size() - 1, (nbAllDernCase + 1) );
+            erreur = true;
+        } else {
+            int nbAllumEnLigne = jeuEssai.get(ligne);
+            int nbAllDernCase = jeuEssai.get(jeuEssai.size() - 1);
+
+            if ((nbAllumEnLigne - nbAllDernCase) > 2) {
+                jeuEssai.set(ligne, (nbAllumEnLigne - 1));
+                jeuEssai.set(jeuEssai.size() - 1, (nbAllDernCase + 1));
                 numTas = ligne;
-            } 
-			
-			// sinon il faut examiner le tas (ligne) suivant du jeu pour eventuellement le decomposer
-			// on recree une nouvelle configuration d'essai identique au plateau de jeu
-			else {
-                // copie du jeu dans JeuEssai
+            } else {
                 jeuEssai.clear();
-                for (i = 0; i < jeu.size(); i++) {
+                for (int i = 0; i < jeu.size(); i++) {
                     jeuEssai.add(jeu.get(i));
                 }
-				
+
                 boolean separation = false;
-                i = ligne + 1; // tas suivant
-				// si il y a encore un tas et qu'il contient au moins 3 allumettes
-				// alors on effectue une premiere separation en enlevant 1 allumette
-                while ( i < jeuEssai.size() && !separation ) {
-					// le tas doit faire minimum 3 allumettes
-                    if ( jeu.get(i) > 2 ) {
+                int i = ligne + 1;
+                while (i < jeuEssai.size() && !separation) {
+                    if (jeu.get(i) > 2) {
                         separation = true;
-						// on commence par enlever 1 allumette a ce tas
                         enlever(jeuEssai, i, 1);
-						numTas = i;
+                        numTas = i;
                     } else {
-                        i = i + 1;
+                        i++;
                     }
-                }				
+                }
             }
         }
-		
-        return numTas;
+
+        return erreur ? -1 : numTas;
     }
 
     /**
@@ -577,22 +670,22 @@ class GrundyRecBruteEff {
         ArrayList<Integer> jeu1 = new ArrayList<>();
         jeu1.add(3);
         ArrayList<int[]> res1 = new ArrayList<>();
-        res1.add(new int[]{0, 1});
+        res1.add(new int[] { 0, 1 });
         testCasListerCoupsPossibles(jeu1, res1);
 
         // Cas 2: Un seul tas de 4 allumettes
         ArrayList<Integer> jeu2 = new ArrayList<>();
         jeu2.add(4);
         ArrayList<int[]> res2 = new ArrayList<>();
-        res2.add(new int[]{0, 1});
+        res2.add(new int[] { 0, 1 });
         testCasListerCoupsPossibles(jeu2, res2);
 
         // Cas 3: Un seul tas de 5 allumettes
         ArrayList<Integer> jeu3 = new ArrayList<>();
         jeu3.add(5);
         ArrayList<int[]> res3 = new ArrayList<>();
-        res3.add(new int[]{0, 1});
-        res3.add(new int[]{0, 2});
+        res3.add(new int[] { 0, 1 });
+        res3.add(new int[] { 0, 2 });
         testCasListerCoupsPossibles(jeu3, res3);
 
         // Cas 4: Deux tas, un de 3 et un de 4 allumettes
@@ -600,18 +693,18 @@ class GrundyRecBruteEff {
         jeu4.add(3);
         jeu4.add(4);
         ArrayList<int[]> res4 = new ArrayList<>();
-        res4.add(new int[]{0, 1});
-        res4.add(new int[]{1, 1});
+        res4.add(new int[] { 0, 1 });
+        res4.add(new int[] { 1, 1 });
         testCasListerCoupsPossibles(jeu4, res4);
 
         // Cas 5: Un tas de 10 allumettes
         ArrayList<Integer> jeu5 = new ArrayList<>();
         jeu5.add(10);
         ArrayList<int[]> res5 = new ArrayList<>();
-        res5.add(new int[]{0, 1});
-        res5.add(new int[]{0, 2});
-        res5.add(new int[]{0, 3});
-        res5.add(new int[]{0, 4});
+        res5.add(new int[] { 0, 1 });
+        res5.add(new int[] { 0, 2 });
+        res5.add(new int[] { 0, 3 });
+        res5.add(new int[] { 0, 4 });
         testCasListerCoupsPossibles(jeu5, res5);
 
         // Cas 6: Aucun tas divisible
@@ -728,17 +821,16 @@ class GrundyRecBruteEff {
         res3.add(3);
         res3.add(2);
         testCasSuivant(jeu3, jeuEssai3, ligne3, res3, resLigne3);
-
     }
 
     /**
      * Test a case of the following method.
-	 * 
-	 * @param jeu the game board.
-	 * @param jeuEssai the game board obtained after separating a heap.
-	 * @param ligne the number of the heap that was last separated.
-	 * @param resJeu is the TestGame expected after separation.
-	 * @param resLigne is the expected number of the heap that is separated.
+     *
+     * @param jeu      the game board.
+     * @param jeuEssai the game board obtained after separating a heap.
+     * @param ligne    the number of the heap that was last separated.
+     * @param resJeu   is the TestGame expected after separation.
+     * @param resLigne is the expected number of the heap that is separated.
      */
     void testCasSuivant(ArrayList<Integer> jeu, ArrayList<Integer> jeuEssai, int ligne, ArrayList<Integer> resJeu, int resLigne) {
         // Arrange
@@ -747,12 +839,193 @@ class GrundyRecBruteEff {
         int noLigne = suivant(jeu, jeuEssai, ligne);
         
         System.out.println("\nnoLigne = " + noLigne + " jeuEssai = " + jeuEssai.toString());
-		boolean egaliteJeux = jeuEssai.equals(resJeu);
-        if ( egaliteJeux && noLigne == resLigne ) {
+        boolean egaliteJeux = jeuEssai.equals(resJeu);
+        if (egaliteJeux && noLigne == resLigne) {
             System.out.println(GREEN + "OK\n" + RESET);
         } else {
             System.err.println(GREEN + "ERREUR\n" + RESET);
         }
     }
 
+    /**
+     * Tests of the estConnuePerdante() method.
+     */
+    void testEstConnuePerdante() {
+        System.out.println();
+        System.out.println(BLUE + "*** testEstConnuePerdante()" + RESET);
+
+        // Cas 1: Losing position already known
+        ArrayList<Integer> jeu1 = new ArrayList<>();
+        jeu1.add(3);
+        jeu1.add(4);
+        ArrayList<Integer> jeu1Normalise = normaliser(jeu1);
+        posPerdantes.add(jeu1Normalise);
+        testCasEstConnuePerdante(jeu1, true);
+
+        // Cas 2: Losing position not known
+        ArrayList<Integer> jeu2 = new ArrayList<>();
+        jeu2.add(5);
+        jeu2.add(6);
+        testCasEstConnuePerdante(jeu2, false);
+
+        // Cas 3: Empty game state
+        ArrayList<Integer> jeu3 = new ArrayList<>();
+        testCasEstConnuePerdante(jeu3, false);
+
+        // Cas 4: Game state with heaps of size 1 and 2 only
+        ArrayList<Integer> jeu4 = new ArrayList<>();
+        jeu4.add(1);
+        jeu4.add(2);
+        testCasEstConnuePerdante(jeu4, false);
+    }
+
+    /**
+     * Tests a case of the estConnuePerdante() method.
+     *
+     * @param jeu The game state.
+     * @param res The expected result.
+     */
+    void testCasEstConnuePerdante(ArrayList<Integer> jeu, boolean res) {
+        // Arrange
+        System.out.print("estConnuePerdante(" + jeu.toString() + ") : ");
+
+        
+        boolean resExec = estConnuePerdante(jeu);
+
+        
+        System.out.print(resExec + " : ");
+        if (resExec == res) {
+            System.out.println(GREEN + "OK" + RESET);
+        } else {
+            System.err.println(RED + "ERREUR" + RESET);
+        }
+    }
+
+    /**
+     * Tests of the estConnueGagnante() method.
+     */
+    void testEstConnueGagnante() {
+        System.out.println();
+        System.out.println(BLUE + "*** testEstConnueGagnante()" + RESET);
+
+        // Cas 1: Winning position already known
+        ArrayList<Integer> jeu1 = new ArrayList<>();
+        jeu1.add(3);
+        jeu1.add(5);
+        ArrayList<Integer> jeu1Normalise = normaliser(jeu1);
+        posGagnantes.add(jeu1Normalise);
+        testCasEstConnueGagnante(jeu1, true);
+
+        // Cas 2: Winning position not known
+        ArrayList<Integer> jeu2 = new ArrayList<>();
+        jeu2.add(4);
+        jeu2.add(6);
+        testCasEstConnueGagnante(jeu2, false);
+
+        // Cas 3: Empty game state
+        ArrayList<Integer> jeu3 = new ArrayList<>();
+        testCasEstConnueGagnante(jeu3, false);
+
+        // Cas 4: Game state with heaps of size 1 and 2 only
+        ArrayList<Integer> jeu4 = new ArrayList<>();
+        jeu4.add(1);
+        jeu4.add(2);
+        testCasEstConnueGagnante(jeu4, false);
+    }
+
+    /**
+     * Tests a case of the estConnueGagnante() method.
+     *
+     * @param jeu The game state.
+     * @param res The expected result.
+     */
+    void testCasEstConnueGagnante(ArrayList<Integer> jeu, boolean res) {
+        // Arrange
+        System.out.print("estConnueGagnante(" + jeu.toString() + ") : ");
+
+        
+        boolean resExec = estConnueGagnante(jeu);
+
+        
+        System.out.print(resExec + " : ");
+        if (resExec == res) {
+            System.out.println(GREEN + "OK" + RESET);
+        } else {
+            System.err.println(RED + "ERREUR" + RESET);
+        }
+    }
+
+    /**
+     * Tests of the simplifier() method.
+     */
+    void testSimplifier() {
+        System.out.println();
+        System.out.println(BLUE + "*** testSimplifier()" + RESET);
+
+        // Cas 1: Simplification possible
+        ArrayList<Integer> jeu1 = new ArrayList<>();
+        jeu1.add(3);
+        jeu1.add(4);
+        jeu1.add(5);
+        ArrayList<Integer> res1 = new ArrayList<>();
+        res1.add(3);
+        res1.add(5);
+        // Suppose [4] is a known losing position
+        ArrayList<Integer> tas4 = new ArrayList<>();
+        tas4.add(4);
+        posPerdantes.add(tas4);
+        testCasSimplifier(jeu1, res1);
+
+        // Cas 2: No simplification possible
+        ArrayList<Integer> jeu2 = new ArrayList<>();
+        jeu2.add(3);
+        jeu2.add(5);
+        ArrayList<Integer> res2 = new ArrayList<>();
+        res2.add(3);
+        res2.add(5);
+        testCasSimplifier(jeu2, res2);
+
+        // Cas 3: Empty game state
+        ArrayList<Integer> jeu3 = new ArrayList<>();
+        ArrayList<Integer> res3 = new ArrayList<>();
+        testCasSimplifier(jeu3, res3);
+
+        // Cas 4: Multiple losing heaps
+        ArrayList<Integer> jeu4 = new ArrayList<>();
+        jeu4.add(3);
+        jeu4.add(4);
+        jeu4.add(5);
+        jeu4.add(6);
+        ArrayList<Integer> res4 = new ArrayList<>();
+        res4.add(3);
+        res4.add(5);
+        // Suppose [4] and [6] are known losing positions
+        ArrayList<Integer> tas6 = new ArrayList<>();
+        tas6.add(6);
+        posPerdantes.add(tas6);
+        testCasSimplifier(jeu4, res4);
+
+    }
+
+    /**
+     * Tests a case of the simplifier() method.
+     *
+     * @param jeu The game state.
+     * @param res The expected simplified game state.
+     */
+    void testCasSimplifier(ArrayList<Integer> jeu, ArrayList<Integer> res) {
+        // Arrange
+        System.out.print("simplifier(" + jeu.toString() + ") : ");
+
+        
+        ArrayList<Integer> resExec = simplifier(jeu);
+
+        
+        System.out.print(resExec.toString() + " : ");
+        if (resExec.equals(res)) {
+            System.out.println(GREEN + "OK" + RESET);
+        } else {
+            System.err.println(RED + "ERREUR" + RESET);
+        }
+    }
 }
